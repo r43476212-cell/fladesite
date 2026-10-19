@@ -1,22 +1,24 @@
-const $ = s => document.querySelector(s);
 
-const loginPanel = $('#loginPanel');
-const appPanel = $('#appPanel');
-const loginMessage = $('#loginMessage');
-const productMessage = $('#productMessage');
-const form = $('#productForm');
+const $ = (selector) => document.querySelector(selector);
+
+const loginPanel = $("#loginPanel");
+const appPanel = $("#appPanel");
+const loginMessage = $("#loginMessage");
+const productMessage = $("#productMessage");
+const form = $("#productForm");
 
 let me = null;
+let loadingProducts = false;
 
 async function api(path, opts = {}) {
     const headers = { ...(opts.headers || {}) };
 
-    if (opts.body && typeof opts.body === 'string') {
-        headers['Content-Type'] = 'application/json';
+    if (opts.body && typeof opts.body === "string") {
+        headers["Content-Type"] = "application/json";
     }
 
     const res = await fetch(path, {
-        credentials: 'same-origin',
+        credentials: "same-origin",
         ...opts,
         headers
     });
@@ -25,191 +27,238 @@ async function api(path, opts = {}) {
 
     try {
         data = await res.json();
-    } catch {}
+    } catch {
+        // Некоторые ответы сервера могут быть не JSON.
+    }
 
     if (!res.ok) {
-        throw new Error(data.error || 'Ошибка запроса');
+        throw new Error(data.error || `Ошибка запроса (${res.status})`);
     }
 
     return data;
 }
 
+function showMessage(element, message, isError = false) {
+    if (!element) return;
+
+    element.textContent = message;
+    element.classList.toggle("error", isError);
+}
+
+function showLogin(message = "") {
+    me = null;
+
+    appPanel?.classList.add("hidden");
+    loginPanel?.classList.remove("hidden");
+
+    if (loginMessage) {
+        showMessage(loginMessage, message, Boolean(message));
+    }
+}
+
 function showApp(user) {
+    if (!user || user.role !== "owner") {
+        showLogin("Доступ разрешён только владельцу магазина.");
+        return;
+    }
+
     me = user;
 
-    loginPanel.classList.add('hidden');
-    appPanel.classList.remove('hidden');
+    loginPanel?.classList.add("hidden");
+    appPanel?.classList.remove("hidden");
 
-    $('#usersPanel').classList.toggle('hidden', user.role !== 'owner');
+    // В этой версии используется только один аккаунт владельца.
+    $("#usersPanel")?.classList.add("hidden");
 
     loadProducts();
-
-    if (user.role === 'owner') {
-        loadUsers();
-    }
 }
 
 function resetForm() {
     form.reset();
-    form.elements.id.value = '';
-    form.elements.visible.checked = true;
-    form.elements.imagesText.value = '';
 
-    $('#formTitle').textContent = 'Добавить товар';
-    $('#cancelEdit').classList.add('hidden');
-    $('#productMessage').textContent = '';
-    $('#uploadStatus').textContent = '';
+    form.elements.id.value = "";
+    form.elements.visible.checked = true;
+    form.elements.imagesText.value = "";
+
+    $("#formTitle").textContent = "Добавить товар";
+    $("#cancelEdit").classList.add("hidden");
+
+    showMessage(productMessage, "");
+    showMessage($("#uploadStatus"), "");
 }
 
-/* Вход в панель */
-$('#loginForm').addEventListener('submit', async e => {
+/* Вход */
+$("#loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    // Сохраняем ссылку на форму до await
     const loginForm = e.currentTarget;
-
-    loginMessage.textContent = 'Входим…';
-
     const f = new FormData(loginForm);
 
+    showMessage(loginMessage, "Входим…");
+
     try {
-        await api('/api/login', {
-            method: 'POST',
+        await api("/api/login", {
+            method: "POST",
             body: JSON.stringify({
-                username: f.get('username'),
-                password: f.get('password')
+                username: f.get("username"),
+                password: f.get("password")
             })
         });
 
         loginForm.reset();
 
-        const user = await api('/api/me');
+        const user = await api("/api/me");
         showApp(user);
     } catch (err) {
-        loginMessage.textContent = err.message;
+        showMessage(loginMessage, err.message, true);
     }
 });
 
 /* Выход */
-$('#logoutBtn').addEventListener('click', async () => {
+$("#logoutBtn").addEventListener("click", async () => {
     try {
-        await api('/api/logout', {
-            method: 'POST',
-            body: '{}'
+        await api("/api/logout", {
+            method: "POST",
+            body: "{}"
         });
     } catch (err) {
-        console.error('Ошибка выхода:', err);
+        console.error("Ошибка выхода:", err);
     } finally {
-        appPanel.classList.add('hidden');
-        loginPanel.classList.remove('hidden');
-        me = null;
+        showLogin();
     }
 });
 
 /* Загрузка фотографий */
-$('#imageFiles').addEventListener('change', async e => {
+$("#imageFiles").addEventListener("change", async (e) => {
     const files = [...e.target.files];
 
     if (!files.length) return;
 
-    const uploaded = [];
+    const existing = form.elements.imagesText.value
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-    $('#uploadStatus').textContent = 'Загружаем фото…';
+    const uploaded = [];
+    const status = $("#uploadStatus");
+
+    showMessage(status, "Загружаем фото…");
 
     try {
         for (const file of files) {
             const fd = new FormData();
-            fd.append('file', file);
+            fd.append("file", file);
 
-            const r = await fetch('/api/upload', {
-                method: 'POST',
+            const res = await fetch("/api/upload", {
+                method: "POST",
                 body: fd,
-                credentials: 'same-origin'
+                credentials: "same-origin"
             });
 
-            const d = await r.json();
+            let data = {};
 
-            if (!r.ok) {
-                throw new Error(d.error || 'Не удалось загрузить фото');
+            try {
+                data = await res.json();
+            } catch {}
+
+            if (!res.ok) {
+                throw new Error(
+                    data.error || `Не удалось загрузить ${file.name}`
+                );
             }
 
-            uploaded.push(d.url);
+            if (!data.url) {
+                throw new Error("Сервер не вернул адрес фотографии");
+            }
+
+            uploaded.push(data.url);
         }
 
-        const existing = form.elements.imagesText.value.trim();
+        const allImages = [...new Set([...existing, ...uploaded])].slice(0, 8);
 
-        form.elements.imagesText.value = [
-            existing,
-            ...uploaded
-        ].filter(Boolean).join('\n');
+        form.elements.imagesText.value = allImages.join("\n");
 
-        if (!form.elements.image.value && uploaded.length) {
-            form.elements.image.value = uploaded[0];
+        if (!form.elements.image.value.trim() && allImages.length) {
+            form.elements.image.value = allImages[0];
         }
 
-        $('#uploadStatus').textContent =
-            `Загружено фотографий: ${uploaded.length}`;
+        showMessage(status, `Загружено фотографий: ${uploaded.length}`);
     } catch (err) {
-        $('#uploadStatus').textContent = err.message;
+        showMessage(status, err.message, true);
+    } finally {
+        // Позволяет повторно выбрать тот же файл.
+        e.target.value = "";
     }
 });
 
 /* Загрузка товаров */
 async function loadProducts() {
-    const list = $('#products');
-    list.textContent = 'Загрузка…';
+    if (loadingProducts) return;
+
+    loadingProducts = true;
+
+    const list = $("#products");
+    list.textContent = "Загрузка…";
 
     try {
-        const { products } = await api('/api/products?all=1');
+        if (!me) {
+            throw new Error("Требуется вход");
+        }
+
+        const { products = [] } = await api("/api/products?all=1");
 
         list.replaceChildren();
 
         if (!products.length) {
-            list.textContent = 'Товаров пока нет.';
+            list.textContent = "Товаров пока нет.";
             return;
         }
 
         for (const p of products) {
-            const card = document.createElement('article');
-            card.className = 'product';
+            const card = document.createElement("article");
+            card.className = "product";
 
-            const img = document.createElement('img');
-            img.src = p.image;
-            img.alt = '';
+            const img = document.createElement("img");
+            img.src = p.image || "";
+            img.alt = p.title || "Фото товара";
+            img.loading = "lazy";
 
-            const info = document.createElement('div');
+            const info = document.createElement("div");
 
-            const title = document.createElement('h3');
+            const title = document.createElement("h3");
             title.textContent = p.title;
 
-            const details = document.createElement('p');
+            const details = document.createElement("p");
             details.textContent =
-                `${Number(p.price).toLocaleString('ru-RU')} ₽ · ` +
+                `${Number(p.price).toLocaleString("ru-RU")} ₽ · ` +
                 `Размеры: ${p.sizes} · ` +
-                `${p.visible ? 'Показывается' : 'Скрыт'}`;
+                `${p.visible ? "Показывается" : "Скрыт"}`;
 
-            const desc = document.createElement('p');
-            desc.textContent = p.description;
+            const description = document.createElement("p");
+            description.textContent = p.description;
 
-            info.append(title, details, desc);
+            info.append(title, details, description);
 
-            const actions = document.createElement('div');
-            actions.className = 'actions';
+            const actions = document.createElement("div");
+            actions.className = "actions";
 
-            const edit = document.createElement('button');
-            edit.className = 'ghost';
-            edit.textContent = 'Изменить';
-            edit.onclick = () => editProduct(p);
+            const edit = document.createElement("button");
+            edit.type = "button";
+            edit.className = "ghost";
+            edit.textContent = "Изменить";
+            edit.addEventListener("click", () => editProduct(p));
 
-            const visibility = document.createElement('button');
-            visibility.className = 'ghost';
-            visibility.textContent = p.visible ? 'Скрыть' : 'Показать';
-            visibility.onclick = () => saveVisibility(p);
+            const visibility = document.createElement("button");
+            visibility.type = "button";
+            visibility.className = "ghost";
+            visibility.textContent = p.visible ? "Скрыть" : "Показать";
+            visibility.addEventListener("click", () => saveVisibility(p));
 
-            const del = document.createElement('button');
-            del.className = 'ghost';
-            del.textContent = 'Удалить';
-            del.onclick = () => deleteProduct(p);
+            const del = document.createElement("button");
+            del.type = "button";
+            del.className = "ghost";
+            del.textContent = "Удалить";
+            del.addEventListener("click", () => deleteProduct(p));
 
             actions.append(edit, visibility, del);
             card.append(img, info, actions);
@@ -218,10 +267,11 @@ async function loadProducts() {
     } catch (err) {
         list.textContent = err.message;
 
-        if (err.message === 'Требуется вход') {
-            appPanel.classList.add('hidden');
-            loginPanel.classList.remove('hidden');
+        if (err.message === "Требуется вход") {
+            showLogin();
         }
+    } finally {
+        loadingProducts = false;
     }
 }
 
@@ -233,193 +283,124 @@ function editProduct(p) {
     form.elements.sizes.value = p.sizes;
     form.elements.description.value = p.description;
     form.elements.image.value = p.image;
-    form.elements.visible.checked = !!p.visible;
-    form.elements.imagesText.value = (p.images || []).join('\n');
+    form.elements.visible.checked = Boolean(p.visible);
 
-    $('#formTitle').textContent = 'Редактировать товар';
-    $('#cancelEdit').classList.remove('hidden');
+    form.elements.imagesText.value = (p.images || [p.image])
+        .filter(Boolean)
+        .join("\n");
+
+    $("#formTitle").textContent = "Редактировать товар";
+    $("#cancelEdit").classList.remove("hidden");
+
+    showMessage(productMessage, "");
 
     window.scrollTo({
         top: 0,
-        behavior: 'smooth'
+        behavior: "smooth"
     });
 }
 
-/* Изменение видимости товара */
+/* Скрытие и повторная публикация */
 async function saveVisibility(p) {
     try {
-        await api('/api/products/' + p.id, {
-            method: 'PUT',
+        await api(`/api/products/${encodeURIComponent(p.id)}`, {
+            method: "PUT",
             body: JSON.stringify({
                 ...p,
                 visible: !p.visible
             })
         });
 
-        loadProducts();
-    } catch (e) {
-        productMessage.textContent = e.message;
+        showMessage(
+            productMessage,
+            p.visible ? "Товар скрыт." : "Товар опубликован."
+        );
+
+        await loadProducts();
+    } catch (err) {
+        showMessage(productMessage, err.message, true);
     }
 }
 
 /* Удаление товара */
 async function deleteProduct(p) {
-    if (!confirm(`Удалить «${p.title}»?`)) return;
+    if (!confirm(`Удалить «${p.title}»? Это действие нельзя отменить.`)) {
+        return;
+    }
 
     try {
-        await api('/api/products/' + p.id, {
-            method: 'DELETE'
+        await api(`/api/products/${encodeURIComponent(p.id)}`, {
+            method: "DELETE"
         });
 
-        loadProducts();
-    } catch (e) {
-        productMessage.textContent = e.message;
+        showMessage(productMessage, "Товар удалён.");
+        await loadProducts();
+    } catch (err) {
+        showMessage(productMessage, err.message, true);
     }
 }
 
-/* Сохранение товара */
-form.addEventListener('submit', async e => {
+/* Добавление и редактирование товара */
+form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    productMessage.textContent = 'Сохраняем…';
+    showMessage(productMessage, "Сохраняем…");
 
     const f = new FormData(form);
-    const id = f.get('id');
+    const id = String(f.get("id") || "").trim();
 
     const image = form.elements.image.value.trim();
 
     const extra = form.elements.imagesText.value
-        .split(/\n/)
-        .map(s => s.trim())
+        .split("\n")
+        .map((s) => s.trim())
         .filter(Boolean);
 
+    const images = [...new Set([image, ...extra].filter(Boolean))].slice(0, 8);
+
+    if (!image) {
+        showMessage(productMessage, "Укажи главное фото товара.", true);
+        return;
+    }
+
     const payload = {
-        title: f.get('title').trim(),
-        price: Number(f.get('price')),
-        sizes: f.get('sizes').trim(),
-        description: f.get('description').trim(),
+        title: String(f.get("title") || "").trim(),
+        price: Number(f.get("price")),
+        sizes: String(f.get("sizes") || "").trim(),
+        description: String(f.get("description") || "").trim(),
         image,
-        images: [...new Set([image, ...extra])],
-        visible: f.get('visible') === 'on'
+        images,
+        visible: f.get("visible") === "on"
     };
 
     try {
         await api(
-            id ? '/api/products/' + id : '/api/products',
+            id
+                ? `/api/products/${encodeURIComponent(id)}`
+                : "/api/products",
             {
-                method: id ? 'PUT' : 'POST',
+                method: id ? "PUT" : "POST",
                 body: JSON.stringify(payload)
             }
         );
 
         resetForm();
-        productMessage.textContent = 'Сохранено';
 
-        loadProducts();
+        showMessage(productMessage, "Товар сохранён.");
+        await loadProducts();
     } catch (err) {
-        productMessage.textContent = err.message;
+        showMessage(productMessage, err.message, true);
     }
 });
 
-$('#cancelEdit').addEventListener('click', resetForm);
+$("#cancelEdit").addEventListener("click", resetForm);
 
-/* Создание аккаунта */
-$('#userForm').addEventListener('submit', async e => {
-    e.preventDefault();
-
-    // Исправление: сохраняем ссылку до await
-    const userForm = e.currentTarget;
-
-    const f = new FormData(userForm);
-
-    $('#userMessage').textContent = 'Создаём аккаунт…';
-
+/* Проверка действующей сессии */
+(async () => {
     try {
-        await api('/api/users', {
-            method: 'POST',
-            body: JSON.stringify({
-                username: f.get('username'),
-                password: f.get('password'),
-                role: f.get('role')
-            })
-        });
-
-        userForm.reset();
-
-        $('#userMessage').textContent = 'Аккаунт создан';
-
-        loadUsers();
-    } catch (err) {
-        $('#userMessage').textContent = err.message;
+        const user = await api("/api/me");
+        showApp(user);
+    } catch {
+        showLogin();
     }
-});
-
-/* Список аккаунтов */
-async function loadUsers() {
-    const list = $('#usersList');
-
-    try {
-        const { users } = await api('/api/users');
-
-        list.replaceChildren();
-
-        for (const u of users) {
-            const row = document.createElement('article');
-            row.className = 'product';
-
-            const info = document.createElement('div');
-
-            const title = document.createElement('h3');
-            title.textContent = u.username;
-
-            const role = document.createElement('p');
-            role.textContent =
-                u.role === 'owner'
-                    ? 'Владелец'
-                    : 'Сотрудник магазина';
-
-            info.append(title, role);
-
-            const actions = document.createElement('div');
-            actions.className = 'actions';
-
-            if (u.id !== me?.sub && u.role !== 'owner') {
-                const del = document.createElement('button');
-
-                del.className = 'ghost';
-                del.textContent = 'Удалить аккаунт';
-
-                del.onclick = async () => {
-                    if (!confirm(`Удалить аккаунт ${u.username}?`)) {
-                        return;
-                    }
-
-                    try {
-                        await api('/api/users/' + u.id, {
-                            method: 'DELETE'
-                        });
-
-                        loadUsers();
-                    } catch (err) {
-                        $('#userMessage').textContent = err.message;
-                    }
-                };
-
-                actions.append(del);
-            }
-
-            row.append(info, actions);
-            list.append(row);
-        }
-    } catch (e) {
-        list.textContent = e.message;
-    }
-}
-
-/* Проверка существующей сессии */
-api('/api/me')
-    .then(showApp)
-    .catch(() => {
-        // Если пользователь не авторизован,
-        // остаёмся на экране входа.
-    });
+})();
