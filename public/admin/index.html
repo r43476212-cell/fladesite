@@ -1,1 +1,120 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Админ-панель — FLADE</title><link rel="stylesheet" href="admin.css"></head><body><main class="shell"><header><a href="../index.html" class="brand">FLADE<span> / ADMIN</span></a><span class="secure">Защищённая панель</span></header><section id="loginPanel" class="panel"><p class="eyebrow">УПРАВЛЕНИЕ МАГАЗИНОМ</p><h1>Вход в панель</h1><p class="muted">Используй личную учётную запись, созданную владельцем сайта.</p><form id="loginForm"><label>Логин<input name="username" autocomplete="username" required minlength="3"></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">Войти</button><p id="loginMessage" class="message" role="status"></p></form></section><section id="appPanel" class="hidden"><div class="heading"><div><p class="eyebrow">КАТАЛОГ</p><h1>Товары</h1></div><button id="logoutBtn" class="ghost">Выйти</button></div><div class="panel"><h2 id="formTitle">Добавить товар</h2><form id="productForm" class="product-form"><input type="hidden" name="id"><label>Название<input name="title" required maxlength="120"></label><label>Цена, ₽<input name="price" type="number" min="0" step="1" required></label><label>Размеры через запятую<input name="sizes" placeholder="41, 42, 43" required></label><label class="wide">Описание<textarea name="description" rows="3" maxlength="1200" required></textarea></label><label class="wide">Фотографии товара (JPG, PNG, WebP, до 400 КБ каждая)<input id="imageFiles" name="imageFiles" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="uploadStatus" class="message wide" role="status"></div><label class="wide">Основное фото<input name="image" placeholder="Загрузи фото выше или укажи URL" required></label><label class="wide">Все фото — URL через новую строку<textarea name="imagesText" rows="2" placeholder="Необязательно; основное фото добавится автоматически"></textarea></label><label class="check"><input name="visible" type="checkbox" checked> Показывать в каталоге</label><div class="form-actions"><button class="primary">Сохранить товар</button><button id="cancelEdit" type="button" class="ghost hidden">Отмена</button></div><p id="productMessage" class="message wide" role="status"></p></form></div><div id="products" class="products"></div><section id="usersPanel" class="panel hidden"><h2>Пользователи</h2><p class="muted">Три отдельных аккаунта максимум. Доступ к управлению пользователями есть только у владельца.</p><form id="userForm" class="product-form"><label>Логин<input name="username" minlength="3" maxlength="32" required></label><label>Пароль (от 12 символов)<input name="password" type="password" minlength="12" required autocomplete="new-password"></label><label>Роль<select name="role"><option value="admin">Сотрудник магазина</option><option value="owner">Владелец</option></select></label><div class="form-actions"><button class="primary">Создать аккаунт</button></div><p id="userMessage" class="message wide" role="status"></p></form><div id="usersList" class="products"></div></section></section></main><script src="admin.js"></script></body></html>
+
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Админ-панель — FLADE</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <a href="../index.html" class="brand">FLADE<span> / ADMIN</span></a>
+      <span class="secure">Защищённая панель</span>
+    </header>
+
+    <section id="loginPanel" class="panel">
+      <p class="eyebrow">УПРАВЛЕНИЕ МАГАЗИНОМ</p>
+      <h1>Вход в панель</h1>
+      <p class="muted">Вход доступен только владельцу магазина.</p>
+
+      <form id="loginForm">
+        <label>
+          Логин
+          <input name="username" autocomplete="username" required minlength="3">
+        </label>
+
+        <label>
+          Пароль
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+
+        <button class="primary" type="submit">Войти</button>
+        <p id="loginMessage" class="message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="appPanel" class="hidden">
+      <div class="heading">
+        <div>
+          <p class="eyebrow">КАТАЛОГ</p>
+          <h1>Товары</h1>
+        </div>
+        <button id="logoutBtn" type="button" class="ghost">Выйти</button>
+      </div>
+
+      <div class="panel">
+        <h2 id="formTitle">Добавить товар</h2>
+
+        <form id="productForm" class="product-form">
+          <input type="hidden" name="id">
+
+          <label>
+            Название
+            <input name="title" required maxlength="120">
+          </label>
+
+          <label>
+            Цена, ₽
+            <input name="price" type="number" min="0" step="1" required>
+          </label>
+
+          <label>
+            Размеры через запятую
+            <input name="sizes" placeholder="41, 42, 43" required>
+          </label>
+
+          <label class="wide">
+            Описание
+            <textarea name="description" rows="3" maxlength="1200" required></textarea>
+          </label>
+
+          <label class="wide">
+            Фотографии товара (JPG, PNG, WebP, до 400 КБ каждая)
+            <input
+              id="imageFiles"
+              name="imageFiles"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+            >
+          </label>
+
+          <div id="uploadStatus" class="message wide" role="status"></div>
+
+          <label class="wide">
+            Основное фото
+            <input name="image" placeholder="Загрузи фото выше или укажи URL" required>
+          </label>
+
+          <label class="wide">
+            Все фото — URL через новую строку
+            <textarea
+              name="imagesText"
+              rows="3"
+              placeholder="Необязательно; основное фото добавится автоматически"
+            ></textarea>
+          </label>
+
+          <label class="check">
+            <input name="visible" type="checkbox" checked>
+            Показывать в каталоге
+          </label>
+
+          <div class="form-actions">
+            <button class="primary" type="submit">Сохранить товар</button>
+            <button id="cancelEdit" type="button" class="ghost hidden">Отмена</button>
+          </div>
+
+          <p id="productMessage" class="message wide" role="status"></p>
+        </form>
+      </div>
+
+      <div id="products" class="products"></div>
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>
