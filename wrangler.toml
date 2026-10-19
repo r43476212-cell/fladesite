@@ -1,0 +1,15 @@
+
+name = "flade-store"
+main = "worker.js"
+compatibility_date = "2026-10-18"
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "local-flade-store-db"
+database_id = "6fef3d41-fef3-48c5-9b5b-d13f3b73cbdf"
+

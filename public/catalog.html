@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Каталог обуви — FLADE</title>
+  <meta name="description" content="Каталог обуви и кроссовок FLADE. Актуальная цена и размеры в наличии.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/flade-logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="catalog-page">
+  <header class="header">
+    <div class="container nav">
+      <a class="brand" href="index.html#top" aria-label="FLADE — главная">
+        <img src="assets/flade-logo.png" alt="Логотип FLADE">
+      </a>
+      <button class="hamburger" id="catalogMenuToggle" type="button" aria-label="Открыть меню" aria-expanded="false">
+        <i></i><i></i><i></i>
+      </button>
+      <nav id="catalogMainNav">
+        <a class="active" href="catalog">Каталог</a>
+        <a href="index.html#about">О магазине</a>
+        <a href="index.html#why">Почему FLADE</a>
+        <a href="index.html#contacts">Контакты</a>
+        <a class="navbtn" href="index.html#contacts">Связаться ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="catalog-intro">
+      <div class="container">
+        <p class="eyebrow"><b></b> FLADE / КАТАЛОГ</p>
+        <h1>Найди свою<br><em>пару.</em></h1>
+        <p>Выбирай модель и размер. Доставка по Саратову бесплатная — уточни детали у магазина.</p>
+        <a class="underlink" href="index.html#top">← На главную</a>
+      </div>
+    </section>
+
+    <section class="catalog-list">
+      <div class="container">
+        <div class="catalog-head">
+          <div>
+            <p class="eyebrow">01 / В НАЛИЧИИ</p>
+            <h2>Обувь <em>для тебя.</em></h2>
+          </div>
+          <span class="catalog-count" id="catalogCount">Загрузка…</span>
+        </div>
+        <div id="catalogProducts" class="catalog-products" aria-live="polite">
+          <p>Загружаем каталог…</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footertop">
+      <a class="footerlogo" href="index.html#top"><img src="assets/flade-logo.png" alt="FLADE"></a>
+      <p>Твой стиль. Твой темп. Твой FLADE.</p>
+      <a href="#top">НАВЕРХ ↑</a>
+    </div>
+    <div class="container footerbottom">
+      <span>© <b id="catalogYear"></b> FLADE</span>
+      <span>МАГАЗИН ОБУВИ И КРОССОВОК</span>
+      <a href="index.html">Главная</a>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // Уникальные имена переменных, чтобы избежать конфликта с другими скриптами.
+      const catalogMenuButton = document.getElementById('catalogMenuToggle');
+      const catalogNavigation = document.getElementById('catalogMainNav');
+
+      if (catalogMenuButton && catalogNavigation) {
+        catalogMenuButton.addEventListener('click', () => {
+          const menuIsOpen = catalogNavigation.classList.toggle('open');
+          catalogMenuButton.setAttribute('aria-expanded', String(menuIsOpen));
+        });
+
+        catalogNavigation.querySelectorAll('a').forEach((catalogLink) => {
+          catalogLink.addEventListener('click', () => {
+            catalogNavigation.classList.remove('open');
+            catalogMenuButton.setAttribute('aria-expanded', 'false');
+          });
+        });
+      }
+
+      const catalogYearElement = document.getElementById('catalogYear');
+      if (catalogYearElement) catalogYearElement.textContent = String(new Date().getFullYear());
+
+      const escapeCatalogText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+
+      const formatCatalogPrice = (price) => {
+        const numericPrice = Number(price);
+        return Number.isFinite(numericPrice) ? `${numericPrice.toLocaleString('ru-RU')} ₽` : 'Уточняйте цену';
+      };
+
+      function renderEmptyCatalog(message) {
+        const catalogProductsElement = document.getElementById('catalogProducts');
+        const catalogCountElement = document.getElementById('catalogCount');
+        if (catalogCountElement) catalogCountElement.textContent = 'Каталог';
+        if (catalogProductsElement) catalogProductsElement.innerHTML = `<p class="catalog-empty">${escapeCatalogText(message)}</p>`;
+      }
+
+      function renderCatalogProducts(products) {
+        const catalogProductsElement = document.getElementById('catalogProducts');
+        const catalogCountElement = document.getElementById('catalogCount');
+        if (!catalogProductsElement || !catalogCountElement) return;
+
+        const productCount = products.length;
+        const countWord = productCount === 1 ? 'товар' : (productCount >= 2 && productCount <= 4 ? 'товара' : 'товаров');
+        catalogCountElement.textContent = `${productCount} ${countWord}`;
+
+        if (productCount === 0) {
+          catalogProductsElement.innerHTML = '<p class="catalog-empty">Скоро здесь появятся товары. Следи за обновлениями FLADE.</p>';
+          return;
+        }
+
+        catalogProductsElement.innerHTML = products.map((product, productIndex) => {
+          const mainImage = product.image || (Array.isArray(product.images) ? product.images[0] : '') || '';
+          const productImages = Array.isArray(product.images) ? [...product.images] : [];
+          if (mainImage && !productImages.includes(mainImage)) productImages.unshift(mainImage);
+          const uniqueImages = [...new Set(productImages.filter(Boolean))];
+          const productSizes = Array.isArray(product.sizes)
+            ? product.sizes
+            : String(product.sizes ?? '').split(',').map((size) => size.trim()).filter(Boolean);
+          const safeTitle = escapeCatalogText(product.title || 'Модель обуви');
+          const imageMarkup = mainImage
+            ? `<img class="main-product-image" src="${escapeCatalogText(mainImage)}" alt="${safeTitle}" loading="lazy">`
+            : '<div class="catalog-empty">Фото скоро появится</div>';
+          const thumbsMarkup = uniqueImages.length > 1
+            ? `<div class="product-thumbs">${uniqueImages.map((image, imageIndex) => `
+                <button class="product-thumb ${imageIndex === 0 ? 'selected' : ''}" type="button" data-product-index="${productIndex}" data-image="${escapeCatalogText(image)}" aria-label="Фото ${imageIndex + 1}">
+                  <img src="${escapeCatalogText(image)}" alt="" loading="lazy">
+                </button>`).join('')}</div>`
+            : '';
+
+          return `<article class="product-card">
+            <div class="product-gallery">
+              <div class="product-main-image">${imageMarkup}</div>
+              ${thumbsMarkup}
+            </div>
+            <div class="product-info">
+              <p class="product-label">КРОССОВКИ / В НАЛИЧИИ</p>
+              <h3>${safeTitle}</h3>
+              <p class="product-price">${formatCatalogPrice(product.price)}</p>
+              <div class="product-divider"></div>
+              <p class="product-description">${escapeCatalogText(product.description || '')}</p>
+              <div class="size-block">
+                <strong>Размеры в наличии</strong>
+                <div class="sizes" aria-label="Доступные размеры">${productSizes.map((size) => `<span>${escapeCatalogText(size)}</span>`).join('')}</div>
+                <small>Перед покупкой уточни наличие размера у магазина.</small>
+              </div>
+              <a class="btn red product-contact" href="index.html#contacts">Уточнить и заказать <span>↗</span></a>
+              <p class="delivery-note"><span>↗</span> Бесплатная доставка по Саратову</p>
+            </div>
+          </article>`;
+        }).join('');
+
+        catalogProductsElement.querySelectorAll('.product-thumb').forEach((thumbnailButton) => {
+          thumbnailButton.addEventListener('click', () => {
+            const productGallery = thumbnailButton.closest('.product-gallery');
+            const mainProductImage = productGallery?.querySelector('.main-product-image');
+            if (mainProductImage) mainProductImage.src = thumbnailButton.dataset.image || '';
+            productGallery?.querySelectorAll('.product-thumb').forEach((button) => {
+              button.classList.toggle('selected', button === thumbnailButton);
+            });
+          });
+        });
+      }
+
+      async function loadFladeCatalog() {
+        const catalogProductsElement = document.getElementById('catalogProducts');
+        const catalogCountElement = document.getElementById('catalogCount');
+        if (!catalogProductsElement || !catalogCountElement) return;
+
+        try {
+          const response = await fetch('/api/products', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+          });
+          if (!response.ok) {
+            throw new Error(`API /api/products вернул статус ${response.status}`);
+          }
+
+          const responseData = await response.json();
+          const products = Array.isArray(responseData)
+            ? responseData
+            : (Array.isArray(responseData.products) ? responseData.products : []);
+          renderCatalogProducts(products);
+        } catch (error) {
+          console.error('[FLADE catalog] Не удалось загрузить товары:', error);
+          renderEmptyCatalog('Каталог временно недоступен. Пожалуйста, обнови страницу чуть позже.');
+        }
+      }
+
+      loadFladeCatalog();
+    })();
+  </script>
+</body>
+</html>
